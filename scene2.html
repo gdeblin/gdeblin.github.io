@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Load d3.js -->
+<script src="https://d3js.org/d3.v4.js"></script>
+
+<!-- Load color scale -->
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+<html>
+	<head>
+		<!-- A bit of CSS: change stroke color of circle on hover (white -> black) -->
+		<style>
+		.bubbles {
+		  stroke-width: 1px;
+		  stroke: black;
+		  opacity: .8
+		}
+		.bubbles:hover {
+		  stroke: black;
+		}
+		body {
+		  background-color: #d2d9db;
+		}
+		</style>
+		<title>Coronavirus Hot Spots</title>
+	</head>
+	<body>
+		<a href="index.html" style="background-color: white"> <- Timeline graph of cases and deaths</a>
+		<div align="center">
+			<h4>Coronavirus Hot Spots in US represented by Counties (8/1/2020)</h4>
+			<p> The below chart represents the counties which is affected the most by coronavirus in US</p>
+			<p> Only the counties which have more than 25,000 confirmed cased till Aug 1, 2020 are considered</p>
+			<p> The bubble represent different counties, color coded by its Stat. You can filter the counties by its State from the colored legends on the right</p>
+			<p> The area of the bubble is proportional to the no of cases. On hovering over the bubble, the # of cases and deaths can be viewed</p>
+			
+			<!-- Create a div where the graph will take place -->
+			<div id="my_dataviz" style="background-color: white"></div>
+		</div>
+	</body>
+</html>
+
+<script>
+
+// set the dimensions and margins of the graph
+var margin = {top: 40, right: 150, bottom: 60, left: 100},
+    width = 1000 - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
+
+// append the svg object to the body of the page
+var svg = d3.select("#my_dataviz")
+  .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform",
+          "translate(" + margin.left + "," + margin.top + ")");
+
+//Read the data
+d3.csv("us-counties.csv", function(data) {
+
+  // ---------------------------//
+  //       AXIS  AND SCALE      //
+  // ---------------------------//
+  
+    // Filter data where number of cases in county is greater than 30000 8/1/2020
+	data = data.filter(function(d) {
+	  return d.cases > 25000;
+	});
+  
+  	var deathsMinCnt = d3.min(data, function(d) { return +d.deaths; });
+	var deathsMaxCnt = d3.max(data, function(d) { return +d.deaths; });
+	
+	var casesMinCnt = d3.min(data, function(d) { return +d.cases; });
+	var casesMaxCnt = d3.max(data, function(d) { return +d.cases; });
+	
+	var states = d3.map(data, function(d){return d.state;}).keys();
+	
+  // Add X axis
+  var x = d3.scaleLog()
+    .domain([casesMinCnt, casesMaxCnt + 10000])
+    .range([ 0, width ]);
+  svg.append("g")
+    .attr("transform", "translate(0," + height + ")")
+    .call(d3.axisBottom(x).ticks(5, "d"));
+
+  // Add X axis label:
+  svg.append("text")
+      .attr("text-anchor", "end")
+      .attr("x", width)
+      .attr("y", height+50 )
+      .text("Cases");
+
+  // Add Y axis
+  var y = d3.scaleLog()
+    .domain([deathsMinCnt, deathsMaxCnt + 2000])
+    .range([ height, 0]);
+  svg.append("g")
+    .call(d3.axisLeft(y).ticks(5, "d"));
+
+  // Add Y axis label:
+  svg.append("text")
+      .attr("text-anchor", "end")
+      .attr("x", 0)
+      .attr("y", -20 )
+      .text("Deaths")
+      .attr("text-anchor", "start")
+	  
+  // Add a scale for bubble size
+  var z = d3.scaleSqrt()
+    .domain([casesMinCnt, casesMaxCnt])
+    .range([ 5, 30]);
+
+  // Add a scale for bubble color
+  var myColor = d3.scaleOrdinal()
+    .domain(states)
+    .range(d3.schemeCategory10);
+
+
+  // ---------------------------//
+  //      TOOLTIP               //
+  // ---------------------------//
+
+  // -1- Create a tooltip div that is hidden by default:
+  var tooltip = d3.select("#my_dataviz")
+    .append("div")
+      .style("opacity", 0)
+      .attr("class", "tooltip")
+      .style("background-color", "black")
+      .style("border-radius", "5px")
+      .style("padding", "10px")
+      .style("color", "white")
+
+  // -2- Create 3 functions to show / update (when mouse move but stay on same circle) / hide the tooltip
+  var showTooltip = function(d) {
+    tooltip
+      .transition()
+      .duration(200)
+    tooltip
+      .style("opacity", 1)
+      .html("County: " + d.county + "</br> State: " + d.state + "</br> Cases: " + d.cases + "</br> Deaths: " + d.deaths)
+      .style("left", (d3.mouse(this)[0]+30) + "px")
+      .style("top", (d3.mouse(this)[1]+30) + "px")
+  }
+  var moveTooltip = function(d) {
+    tooltip
+      .style("left", (d3.mouse(this)[0]+30) + "px")
+      .style("top", (d3.mouse(this)[1]+30) + "px")
+  }
+  var hideTooltip = function(d) {
+    tooltip
+      .transition()
+      .duration(200)
+      .style("opacity", 0)
+  }
+
+
+  // ---------------------------//
+  //       HIGHLIGHT GROUP      //
+  // ---------------------------//
+
+  // What to do when one group is hovered
+  var highlight = function(d){
+    // reduce opacity of all groups
+    d3.selectAll(".bubbles").style("opacity", .05)
+    // expect the one that is hovered
+    d3.selectAll("."+d.split(' ').join('_')).style("opacity", 1)
+	console.log(d);
+  }
+
+  // And when it is not hovered anymore
+  var noHighlight = function(d){
+    d3.selectAll(".bubbles").style("opacity", 1)
+  }
+
+
+  // ---------------------------//
+  //       CIRCLES              //
+  // ---------------------------//
+
+  // Add dots
+  svg.append('g')
+    .selectAll("dot")
+    .data(data)
+    .enter()
+    .append("circle")
+      .attr("class", function(d) { return "bubbles " + d.state.split(' ').join('_')})
+      .attr("cx", function (d) { return x(d.cases); } )
+      .attr("cy", function (d) { return y(d.deaths); } )
+      .attr("r", function (d) { return z(d.cases); } )
+      .style("fill", function (d) { return myColor(d.state); } )
+    // -3- Trigger the functions for hover
+    .on("mouseover", showTooltip )
+    .on("mousemove", moveTooltip )
+    .on("mouseleave", hideTooltip )
+
+    // ---------------------------//
+    //       LEGEND              //
+    // ---------------------------//
+
+    // Add one dot in the legend for each name.
+    var size = 20
+    var allgroups = states
+    svg.selectAll("myrect")
+      .data(allgroups)
+      .enter()
+      .append("circle")
+        .attr("cx", 800)
+        .attr("cy", function(d,i){ return 10 + i*(size+5)}) // 100 is where the first dot appears. 25 is the distance between dots
+        .attr("r", 7)
+        .style("fill", function(d){ return myColor(d)})
+        .on("mouseover", highlight)
+        .on("mouseleave", noHighlight)
+
+    // Add labels beside legend dots
+    svg.selectAll("mylabels")
+      .data(allgroups)
+      .enter()
+      .append("text")
+        .attr("x", 800 + size*.8)
+        .attr("y", function(d,i){ return i * (size + 5) + (size/2)}) // 100 is where the first dot appears. 25 is the distance between dots
+        .style("fill", function(d){ return myColor(d)})
+        .text(function(d){ return d})
+        .attr("text-anchor", "left")
+        .style("alignment-baseline", "middle")
+        .on("mouseover", highlight)
+        .on("mouseleave", noHighlight)
+  })
+</script>

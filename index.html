@@ -1,1 +1,253 @@
-Hello World
+<!doctype html>
+<html>
+	
+    <head>
+        <meta charset="utf-8">
+        <meta name="description" content="">
+        <!-- Bootstrap Core CSS -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.3/css/bootstrap.min.css">
+        <!-- jQuery UI CSS -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.structure.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.theme.min.css">
+		
+		<style>
+			body {
+			  background-color: #d2d9db;
+			}
+		</style>
+		<title>Coronavirus cases in US</title>
+    </head>
+
+    <body>
+		<a href="scene2.html" style="background-color: white"> Timeline graph of cases and deaths -> </a>
+		<div align="center">
+			<h4>Coronavirus Cases history in the United States (7/30/2020)</h4>
+			</br>
+			<p> The below chart represents the coronavirus case and death counts from the first case detected in Jan 21, 2020 to Jul 30, 2020</p>
+			<p> The graph also shows here the cases spiked which was in April and then again in July</p>
+			<p> You can choose date range from the slider below to see the growth curve for a shorter period of time</p>
+
+			<nav class="navbar navbar-default"></nav>
+		
+			
+			<!-- Bootstrap grid setup -->
+			<div class="container" style="background-color: white">
+				<div id="selections" class="row">
+					<div class="col-md-4">
+						<div id="slider-div" style="margin-left:400px;width: 400px">
+							<label>Date: <span id="dateLabel1"></span> - <span id="dateLabel2"></span></label>
+							<div id="date-slider"></div>
+						</div>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-md-12">
+						<div id="chart-area"></div>                  
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- External JS libraries -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.3/js/bootstrap.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.7.0/d3.min.js"></script>
+
+    </body>
+</html>
+
+<script>
+	var margin = { left:40, right:40, top:40, bottom:80 },
+		height = 400 - margin.top - margin.bottom, 
+		width = 800 - margin.left - margin.right;
+
+	var svg = d3.select("#chart-area").append("svg")
+		.attr("width", width + margin.left + margin.right)
+		.attr("height", height + margin.top + margin.bottom);
+
+	var g = svg.append("g")
+		.attr("transform", "translate(" + margin.left + 
+			", " + margin.top + ")");
+
+	// Time parser for x-scale
+	var parseTime = d3.timeParse("%m/%d/%Y");
+	var formatTime = d3.timeFormat("%m/%d/%Y");
+
+	//Transition time
+	var t = function(){ return d3.transition().duration(1000); }
+
+	// Scales
+	var x = d3.scaleTime().range([0, width]);
+	var y = d3.scaleLinear().range([height, 0]);
+
+	// Axis generators
+	var xAxisCall = d3.axisBottom();
+	var yAxisCall = d3.axisLeft()
+		.ticks(7)
+		.tickFormat(function(d) { return d3.format(".2s")(d);});
+
+	// Axis groups
+	var xAxis = g.append("g")
+		.attr("class", "x axis")
+		.attr("transform", "translate(0," + height + ")");
+	var yAxis = g.append("g")
+		.attr("class", "y axis")
+
+	var valueFiguresColour = d3.scaleOrdinal(d3.schemeSet1);
+
+	var valueFigures = ["Deaths", "Cases"];
+
+	var legend = g.append("g")
+		.attr("class", "legend")
+		.attr("transform", "translate(" + 120 +
+			"," + 5 + ")");
+
+	valueFigures.forEach(function(values, i){
+		var legendRow = legend.append("g")
+			.attr("transform", "translate(0, " + (i * 20) + ")");
+
+		legendRow.append("rect")
+			.attr("width", 10)
+			.attr("height", 10)
+			.attr("fill", valueFiguresColour(values));
+
+		legendRow.append("text")
+			.attr("x", -10)
+			.attr("y", 10)
+			.attr("text-anchor", "end")
+			.style("text-transform", "capitalize")
+			.text(values);
+	});
+
+	var xLabel = g.append("text")
+		.attr("class", "x axis-label")
+		.attr("x", width / 2)
+		.attr("y", height + 50)
+		.attr("font-size", "20px")
+		.attr("text-anchor", "middle")
+		.text("Date ");
+
+
+	d3.csv("us.csv").then(function(data) {
+   // Data cleaning
+	data.forEach(function(d) {
+		d.date = parseTime(d.date);
+		d.cases = +d.cases;
+		d.deaths = +d.deaths;
+	});
+
+	var startDate = d3.min(data, function(d) { return +d.date; });
+	var endDate = d3.max(data, function(d) { return +d.date; });
+
+	$("#dateLabel1").text(formatTime(startDate));
+	$("#dateLabel2").text(formatTime(endDate));
+	
+	// Add jQuery UI slider
+	$("#date-slider").slider({
+		range: true,
+		min: startDate,
+		max: endDate,
+		step: 86400000, // One day
+		values: [startDate, endDate],
+		slide: function(event, ui){
+			$("#dateLabel1").text(formatTime(new Date(ui.values[0])));
+			$("#dateLabel2").text(formatTime(new Date(ui.values[1])));
+			update(data);
+		}
+	});
+	
+	// Set scale domains
+	x.domain(d3.extent(data, function(d) { return d.date; }));
+	y.domain([d3.min(data, function(d) { return d.cases; }), 
+		d3.max(data, function(d) { return d.cases; })]);
+
+	// Generate axes once scales have been set
+	xAxis.call(xAxisCall.scale(x))
+	yAxis.call(yAxisCall.scale(y))
+
+	// Path generator
+	var line = d3.line()
+	  .x(function(d){ return x(d.date); })
+	  .y(function(d){ return y(d.deaths); });
+	  
+	var line2 = d3.line()
+	  .x(function(d){ return x(d.date); })
+	  .y(function(d){ return y(d.cases); });
+	  
+	// Add line to chart
+	g.append("path")
+		.attr("class", "line")
+		.attr('fill', 'rgba(0,0,0,0)')
+		.style("stroke", "red")
+		.attr("stroke", "#E51A1D")
+		.attr("stroke-width", "2px")
+		.attr("d", line(data));
+
+	var path = g.append("path")
+		.attr("class", "line2")
+		.attr("fill", "rgba(0,0,0,0)")
+		.style("stroke", "#377DB8")
+		.attr("stroke-width", "2px")
+		.attr("d", line2(data));
+
+	update(data);
+	
+	function update(data) {
+		g.selectAll("#spikeText").remove();
+		// Filter data based on selections
+		var sliderValues = $("#date-slider").slider("values");
+		
+		var dataTimeFiltered = data.filter(function(d){
+			return ((d.date >= sliderValues[0]) && (d.date <= sliderValues[1]))
+		});
+
+		// Update scales
+		x.domain(d3.extent(dataTimeFiltered, function(d){ return d.date; }));
+		y.domain([0, d3.max(dataTimeFiltered, function(d){ return d.cases; }) ]);
+
+
+		// Update axes
+		xAxisCall.scale(x); xAxis.transition(t()).call(xAxisCall);
+		yAxisCall.scale(y); yAxis.transition(t()).call(yAxisCall);
+		
+		// Update our line path
+		g.select(".line")
+			.transition(t)
+			.attr("d", line(dataTimeFiltered));
+
+		g.select(".line2")
+			.transition(t)
+			.attr("d", line2(dataTimeFiltered));
+			
+		var pathNode = path.node();
+		var pathLength = pathNode.getTotalLength();
+		var maxSlope = 0.3;
+		var spikeCount = 0;
+		for (i = 0.0; i < 1; i+= 0.1) {
+		  var pathPoint1 = pathNode.getPointAtLength(pathLength*i);
+		  var pathPoint2 = pathNode.getPointAtLength(pathLength*(i+0.1));
+		  var slope = (pathPoint1.y - pathPoint2.y)/(pathPoint2.x - pathPoint1.x);
+		  if(slope > maxSlope) {
+			maxSlope = slope + 0.2;
+			
+			g.append("text")
+			.attr("id", "spikeText")
+			.attr("x", pathPoint1.x)
+			.attr("y", pathPoint1.y)
+			.text("Spike # " + ++spikeCount) 
+			.attr("font-family", "sans-serif")
+			.attr("font-size", "16px")
+			.attr("fill", "red");
+		  }
+	    }
+	}
+	
+	
+	
+
+});
+
+
+</script>
+
